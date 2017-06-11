@@ -9,8 +9,12 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.TextView
+import com.imjaspreet.mvvm_with_kotlin.App
 import com.imjaspreet.mvvm_with_kotlin.R
+import com.imjaspreet.mvvm_with_kotlin.data.Injector
 import com.imjaspreet.mvvm_with_kotlin.data.model.Repository
+import io.reactivex.android.schedulers.AndroidSchedulers
+import io.reactivex.observers.DisposableObserver
 
 /**
  * Created by jaspreet on 10/06/17.
@@ -24,8 +28,9 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
     var searchButtonVisibility: ObservableInt
     var infoMessage: ObservableField<String>
 
-    //    var disposable: DisposableObserver
-//    var repositories: List<Repository>
+    var disposable: DisposableObserver<Repository>? = null
+    var repositories: List<Repository>? = null
+
     lateinit var editTextUsernameValue: String
 
     init {
@@ -39,25 +44,24 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
 
     override fun destroy() {
 
-//        if (disposable != null && !disposable.isDisposed()) disposable.dispose();
-//        disposable = null;
-        context = null;
-        dataListener = null;
+        if(!disposable!!.isDisposed) disposable!!.dispose()
+        disposable = null
+        context = null
+        dataListener = null
     }
-
 
     fun onSearchAction(view: TextView, actionId: Int, event: KeyEvent): Boolean {
         if (actionId == EditorInfo.IME_ACTION_SEARCH) {
             val username = view.text.toString()
-            if (username.length > 0)
-//                loadGithubRepos(username)
+            if (username.isNotEmpty())
+                loadRepositories(username)
                 return true
         }
         return false
     }
 
     fun onClickSearch(view: View) {
-
+        loadRepositories(editTextUsernameValue)
     }
 
     fun getUsernameEditTextWatcher(): TextWatcher {
@@ -75,6 +79,42 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
 
             }
         }
+    }
+
+    private fun loadRepositories(username : String) {
+
+        progressVisibility.set(View.VISIBLE)
+        recyclerViewVisibility.set(View.INVISIBLE)
+        infoMessageVisibility.set(View.INVISIBLE)
+        if(!disposable!!.isDisposed) disposable!!.dispose()
+        val injector = Injector()
+        val api = injector.provideApi()
+        disposable = api.getRepositories(username)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeOn(App.instance?.defaultSubscribeScheduler())
+                .subscribeWith(object : DisposableObserver<Repository>() {
+                    override fun onNext(value: Repository) {
+                        this@MainViewModel.repositories = repositories
+                    }
+
+                    override fun onError(e: Throwable) {
+                        progressVisibility.set(View.INVISIBLE)
+                        infoMessage.set(context?.getString(R.string.error_username_not_found))
+                        infoMessageVisibility.set(View.VISIBLE)
+
+                    }
+
+                    override fun onComplete() {
+                        dataListener?.onRepositoriesChanged(repositories!!)
+                        progressVisibility.set(View.INVISIBLE)
+                        if (!repositories?.isEmpty()!!) {
+                            recyclerViewVisibility.set(View.VISIBLE)
+                        } else {
+                            infoMessage.set(context?.getString(R.string.text_empty_repos))
+                            infoMessageVisibility.set(View.VISIBLE)
+                        }
+                    }
+                })
     }
 
     interface DataListener {
