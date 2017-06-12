@@ -28,7 +28,7 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
     var searchButtonVisibility: ObservableInt
     var infoMessage: ObservableField<String>
 
-    var disposable: DisposableObserver<Repository>? = null
+    var disposable: DisposableObserver<List<Repository>>? = null
     var repositories: List<Repository>? = null
 
     lateinit var editTextUsernameValue: String
@@ -92,32 +92,35 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
         disposable = api.getRepositories(username)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeOn(App.instance?.defaultSubscribeScheduler())
-                .subscribeWith(object : DisposableObserver<Repository>() {
-                    override fun onNext(value: Repository) {
-                        this@MainViewModel.repositories = repositories
-                    }
-
-                    override fun onError(e: Throwable) {
-                        progressVisibility.set(View.INVISIBLE)
-                        infoMessage.set(context?.getString(R.string.error_username_not_found))
-                        infoMessageVisibility.set(View.VISIBLE)
-
-                    }
-
-                    override fun onComplete() {
-                        dataListener?.onRepositoriesChanged(repositories!!)
-                        progressVisibility.set(View.INVISIBLE)
-                        if (!repositories?.isEmpty()!!) {
-                            recyclerViewVisibility.set(View.VISIBLE)
-                        } else {
-                            infoMessage.set(context?.getString(R.string.text_empty_repos))
-                            infoMessageVisibility.set(View.VISIBLE)
-                        }
-                    }
-                })
+                .subscribeWith(LongOperationObserver())
     }
 
     interface DataListener {
         fun onRepositoriesChanged(repositories: List<Repository>)
+    }
+
+    private inner class LongOperationObserver : DisposableObserver<List<Repository>>() {
+
+        override fun onNext(value: List<Repository>) {
+            this@MainViewModel.repositories = repositories
+        }
+
+        override fun onError(e: Throwable) {
+            progressVisibility.set(View.INVISIBLE)
+            infoMessage.set(context?.getString(R.string.error_username_not_found))
+            infoMessageVisibility.set(View.VISIBLE)
+
+        }
+
+        override fun onComplete() {
+            dataListener?.onRepositoriesChanged(repositories!!)
+            progressVisibility.set(View.INVISIBLE)
+            if (!repositories?.isEmpty()!!) {
+                recyclerViewVisibility.set(View.VISIBLE)
+            } else {
+                infoMessage.set(context?.getString(R.string.text_empty_repos))
+                infoMessageVisibility.set(View.VISIBLE)
+            }
+        }
     }
 }
