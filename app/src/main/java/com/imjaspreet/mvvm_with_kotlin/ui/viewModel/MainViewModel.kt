@@ -86,7 +86,6 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
         progressVisibility.set(View.VISIBLE)
         recyclerViewVisibility.set(View.INVISIBLE)
         infoMessageVisibility.set(View.INVISIBLE)
-        if(!disposable!!.isDisposed) disposable!!.dispose()
         val injector = Injector()
         val api = injector.provideApi()
         disposable = api.getRepositories(username)
@@ -102,7 +101,7 @@ class MainViewModel(var context : Context?, var dataListener : DataListener?) : 
     private inner class LongOperationObserver : DisposableObserver<List<Repository>>() {
 
         override fun onNext(value: List<Repository>) {
-            this@MainViewModel.repositories = repositories
+            this@MainViewModel.repositories = value
         }
 
         override fun onError(e: Throwable) {
